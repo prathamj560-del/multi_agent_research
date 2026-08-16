@@ -1,9 +1,19 @@
+import datetime
 import os
 import sys
 import time
 from dotenv import load_dotenv
+import streamlit as st
 
 load_dotenv()
+
+try:
+    if hasattr(st, "secrets"):
+        for k, v in st.secrets.items():
+            if isinstance(v, str) and k not in os.environ:
+                os.environ[k] = v
+except Exception:
+    pass
 
 from agents import build_reader_agent, build_search_agent, critic_chain, writer_chain
 from tools import extract_first_url, scrape_url, web_search

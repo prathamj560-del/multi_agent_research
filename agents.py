@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import streamlit as st
 from langchain.agents import create_agent
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,6 +8,15 @@ from langchain_groq import ChatGroq
 from tools import scrape_url, web_search
 
 load_dotenv()
+
+# Streamlit Community Cloud / Hosted platform secrets sync
+try:
+    if hasattr(st, "secrets"):
+        for k, v in st.secrets.items():
+            if isinstance(v, str) and k not in os.environ:
+                os.environ[k] = v
+except Exception:
+    pass
 
 # Model setup with Groq API
 # "llama-3.1-8b-instant" has a 30,000 TPM limit on Groq Free Tier (recommended to avoid 429 rate limits).

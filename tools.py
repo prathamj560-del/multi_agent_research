@@ -4,10 +4,20 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+import streamlit as st
 from langchain.tools import tool
 from tavily import TavilyClient
 
 load_dotenv()
+
+# Streamlit Community Cloud / Hosted platform secrets sync
+try:
+    if hasattr(st, "secrets"):
+        for k, v in st.secrets.items():
+            if isinstance(v, str) and k not in os.environ:
+                os.environ[k] = v
+except Exception:
+    pass
 
 
 def _get_tavily_client() -> TavilyClient:
