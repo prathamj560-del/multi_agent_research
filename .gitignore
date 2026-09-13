@@ -41,3 +41,11 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/

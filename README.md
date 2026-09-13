@@ -1,131 +1,111 @@
-# 🔬 ResearchMind: Multi-Agent AI Research System (Powered by Groq)
+# 🔬 ResearchMind: Self-Correcting Multi-Agent Research System
 
-A multi-agent autonomous research system built with **LangChain**, **Groq LLMs**, and **Streamlit**. It coordinates specialized AI agents to gather intelligence, scrape in-depth content from the web, synthesize a structured report, and critically evaluate the final output with extreme speed.
+[![CI](https://github.com/prathamj560-del/multi_agent_research/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](pyproject.toml)
+[![Checked with mypy](https://img.shields.io/badge/mypy-checked-blue)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](#-license)
 
----
+An autonomous research pipeline built on a **LangGraph state machine**, **Groq LPU inference**, and **Pydantic structured outputs**. Specialized agents discover sources, scrape them concurrently, synthesize a structured report — then a critic **scores the report and triggers an automatic revision loop** until quality clears the threshold (or the revision budget is spent).
 
-## ⚡ Why Groq?
+## ✨ Highlights
 
-By utilizing **Groq's LPU Inference Engine**, ResearchMind executes agentic tool calls, complex reasoning, and multi-step evaluations with near-instant response times using state-of-the-art open models such as **Llama 3.3 70B**.
+- **LangGraph state machine** — `discover → write → critique → (revise?) → …` with a conditional self-correction loop, not a linear script.
+- **Pydantic structured outputs** — the critic returns a validated `Critique` model (score, strengths, improvements, verdict); malformed LLM output can't crash the run.
+- **Concurrent async scraping** — top sources fetched in parallel with httpx under a bounded semaphore.
+- **Real observability** — per-run token usage, wall time, revision count and critic score surfaced in the UI; structured JSON logging optional.
+- **TTL-cached search** — repeated topics don't burn Tavily quota.
+- **Production hygiene** — typed `pydantic-settings` config, testable package layout (`src/`), pytest suite with mocked Tavily/HTTP/LLM, ruff + mypy + pytest enforced in CI, Dockerfile for one-command deploys.
 
----
-
-## 🤖 Multi-Agent Architecture
+## 🏗 Architecture
 
 ```mermaid
 flowchart LR
-    A[Topic Input] --> B[1. Search Agent\nGroq + Tavily]
-    B --> C[2. Reader Agent\nGroq + Web Scraper]
-    C --> D[3. Writer Chain\nGroq Synthesis]
-    D --> E[4. Critic Chain\nGroq Evaluation]
-    E --> F[Final Research Report & Score]
+    A[Topic Input] --> B["🔍 Discover<br/>Tavily search + async scrape<br/>+ LLM summary"]
+    B --> C["✍️ Write<br/>Report synthesis"]
+    C --> D["🧐 Critique<br/>Pydantic structured output"]
+    D --> E{"score ≥ threshold?<br/>revisions left?"}
+    E -- "no" --> F[Final Report<br/>+ score + token usage]
+    E -- "yes" --> G[🔁 Revise] --> C
 ```
 
-1. **Search Agent**: Uses Tavily search to fetch the most relevant, up-to-date web articles and snippets for the research topic.
-2. **Reader Agent**: Autonomously inspects search results, chooses top source URLs, and scrapes clean, full-text content.
-3. **Writer Chain**: Synthesizes the raw search results and scraped deep content into a structured, professional research report.
-4. **Critic Chain**: Evaluates the drafted report against strict criteria, scoring it out of 10 and offering constructive strengths and critique.
+The **revise edge is the differentiator**: the writer receives the critique's `improvements` list as explicit revision instructions, so drafts measurably improve across iterations.
 
----
+## 📋 Requirements
 
-## 📋 Requirements & Prerequisites
+- Python **3.10+**
+- **Groq API key** (free): [console.groq.com/keys](https://console.groq.com/keys)
+- **Tavily API key** (free tier): [app.tavily.com](https://app.tavily.com/)
 
-- **Python 3.10+**
-- **Groq API Key** (Free): [Get Groq API Key](https://console.groq.com/keys)
-- **Tavily API Key** (Free tier available): [Get Tavily API Key](https://app.tavily.com/)
-
----
-
-## 🚀 Quickstart Guide
-
-### 1. Clone & Navigate to Project
+## 🚀 Quickstart
 
 ```bash
-cd Multi-agent-research-system-main
-```
+# 1. Install (creates an editable install with dev tools)
+pip install -e ".[dev]"
 
-### 2. (Optional) Create & Activate a Virtual Environment
+# 2. Configure keys
+cp .env.example .env        # then edit .env
 
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure API Keys
-
-Create a `.env` file in the root directory (you can copy `.env.example`):
-
-```bash
-# Windows PowerShell
-copy .env.example .env
-
-# macOS / Linux
-cp .env.example .env
-```
-
-Open `.env` and fill in your keys:
-
-```env
-GROQ_API_KEY=gsk_your_groq_api_key_here
-TAVILY_API_KEY=tvly-your_tavily_api_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
-```
-
-> **Supported Groq Models**:
-> - `llama-3.3-70b-versatile` (Default, recommended for reasoning & report synthesis)
-> - `llama-3.1-8b-instant` (Fastest, low latency)
-> - `mixtral-8x7b-32768` (High context)
-
----
-
-## 💻 Running the Application
-
-### Option A: Interactive Streamlit Web UI (Recommended)
-
-Launch the web interface:
-
-```bash
+# 3a. Run the web UI
 streamlit run app.py
+
+# 3b. Or the CLI
+researchmind "solid-state battery commercialization"
+python -m researchmind.cli "impact of quantum error correction"   # equivalent
 ```
 
-Open your browser at `http://localhost:8501`. Enter any topic to watch the agents execute step-by-step in real time!
-
-### Option B: Terminal CLI Pipeline
-
-Run the pipeline directly from your command line:
+## 🧪 Development
 
 ```bash
-python pipeline.py
+ruff check src tests app.py          # lint
+mypy src                             # static types
+pytest --cov=src/researchmind        # tests with coverage
 ```
 
----
+All external services (Tavily, web pages, LLMs) are faked in tests — the suite runs fully offline and deterministically.
+
+## 🎯 Evals
+
+Tests prove the code *runs*; evals prove the *output is still good*. The eval harness is a golden-set regression suite for AI behavior:
+
+```bash
+researchmind-evals                              # offline golden-set suite (free, CI-safe)
+python -m researchmind.live_evals "topic"       # live run vs the rubric (uses API quota)
+```
+
+The rubric checks: required report sections, minimum length, source citations, critic score validity, and — the money check — that **a revision actually improves the critic's score**. If a prompt or model change silently breaks the self-correction loop, the evals go red while unit tests stay green. Offline evals run in CI on every push.
+
+## 🐳 Docker
+
+```bash
+docker build -t researchmind .
+docker run -p 8501:8501 --env-file .env researchmind
+```
 
 ## 📁 Project Structure
 
 ```
-Multi-agent-research-system/
-├── app.py              # Modern Streamlit Web Application
-├── agents.py           # Agent and Chain definitions using ChatGroq
-├── pipeline.py         # Sequential multi-agent pipeline runner (CLI)
-├── tools.py            # Custom tools (Tavily search & URL scraper)
-├── requirements.txt    # Python package dependencies
-├── .env.example        # Environment variable template
-└── README.md           # Project documentation
+├── app.py                       # Streamlit UI (thread + queue event streaming)
+├── src/researchmind/
+│   ├── config.py                # pydantic-settings configuration
+│   ├── logging_conf.py          # stdlib JSON/console logging
+│   ├── models.py                # SearchHit, ScrapedPage, Critique, TokenUsage
+│   ├── tools.py                 # cached Tavily search + async httpx scraper
+│   ├── chains.py                # writer / critic chains (usage-aware)
+│   ├── graph.py                 # LangGraph state machine + revision loop
+│   ├── evals.py                 # golden-set eval harness (offline)
+│   ├── live_evals.py            # opt-in live eval runner
+│   └── cli.py                   # rich terminal client
+├── tests/                       # pytest suite (offline, mocked services)
+├── .github/workflows/ci.yml     # ruff + mypy + pytest
+├── Dockerfile
+└── pyproject.toml               # packaging + tool config
 ```
 
----
+## ⚙️ Configuration
 
-## 🛡️ License
+All settings are environment variables (see `.env.example`): `GROQ_MODEL` (default `openai/gpt-oss-120b`; use `openai/gpt-oss-20b` for lowest latency), `SEARCH_MAX_RESULTS`, `NUM_SOURCES`, `QUALITY_THRESHOLD` (default 8/10), `MAX_REVISIONS` (default 2), `LOG_LEVEL`, `LOG_JSON`.
 
-MIT License. Feel free to modify and build upon this research system!
+## 🛡 License
+
+MIT.
