@@ -261,7 +261,16 @@ if submitted:
 result = st.session_state.last_run
 if result:
     if result.get("error"):
-        st.error(f"Pipeline error: {result['error']}")
+        error_msg: str = result["error"]
+        if "does not exist or you do not have access" in error_msg:
+            st.error(
+                f"Pipeline error: {error_msg}"
+                "\n\n**Likely cause:** the configured GROQ_MODEL was retired by Groq, or a stale "
+                "GROQ_MODEL environment variable is overriding your `.env` (env vars beat .env). "
+                "Set it to an available model, e.g. `openai/gpt-oss-120b`, and restart Streamlit."
+            )
+        else:
+            st.error(f"Pipeline error: {error_msg}")
         st.stop()
 
     render_stepper({key: "done" for key, _, _ in STEPS})
